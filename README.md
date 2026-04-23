@@ -53,4 +53,3 @@ ParkCode allows users to:
 
 ---
 
-## 📷 Demo (Coming Soon)

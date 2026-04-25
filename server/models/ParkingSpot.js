@@ -14,11 +14,9 @@ const parkingSchema = new mongoose.Schema({
   vehicleType: {
     type: String,
     enum: ["2w", "4w"],
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now,
-  },
+  }
+}, {
+  timestamps: true   
 });
 
 export default mongoose.model("ParkingSpot", parkingSchema);

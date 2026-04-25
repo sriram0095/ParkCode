@@ -9,7 +9,7 @@ app.use(cors());
 app.use(express.json());
 
 // MongoDB connection
-mongoose.connect("mongodb+srv://sriram:sriram441@cluster1.mm2tz1h.mongodb.net/parkcode?retryWrites=true&w=majority&appName=Cluster1")
+mongoose.connect("mongodb://sriram:sriram441@ac-cxnzixe-shard-00-00.mm2tz1h.mongodb.net:27017,ac-cxnzixe-shard-00-01.mm2tz1h.mongodb.net:27017,ac-cxnzixe-shard-00-02.mm2tz1h.mongodb.net:27017/parkcode?ssl=true&replicaSet=atlas-lnsp4w-shard-0&authSource=admin&retryWrites=true&w=majority&appName=Cluster1")
   .then(() => console.log("MongoDB Connected"))
   .catch(err => console.log(err));
 
@@ -40,7 +40,7 @@ app.get("/api/parking", async (req, res) => {
           Math.pow(spot.location.lng - userLng, 2)
         );
         // filters spots within a small radius (~1km approx)
-        return distance < 0.01; // adjust this radius
+        return distance < 0.05; // adjust this radius
       });
     }
 
@@ -53,11 +53,15 @@ app.get("/api/parking", async (req, res) => {
 
 app.put("/api/parking/:id", async (req, res) => {
   try {
-    const updatedSpot = await ParkingSpot.findByIdAndUpdate(//used to update few details in existing data
-      req.params.id,//we update the data using its id
-      req.body,
-      { new: true }
+    const updatedSpot = await ParkingSpot.findByIdAndUpdate(
+      req.params.id,
+      {
+        ...req.body,
+        updatedAt: new Date() // 🔥 force update time
+      },
+      { returnDocument: 'after' }
     );
+
     res.json(updatedSpot);
   } catch (err) {
     res.status(500).json({ error: err.message });

@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>ParkCode Map</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <style>
+    #map {
+      height: 100vh;
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+
+<h2>🚗 ParkCode Map</h2>
+
+<!-- 🎨 Legend -->
+<div style="
+  position:absolute;
+  top:60px;
+  right:10px;
+  background:white;
+  padding:12px;
+  border-radius:10px;
+  box-shadow:0 2px 10px rgba(0,0,0,0.2);
+  z-index:1000;">
+  <b>Legend</b><br>
+  🟢 Available<br>
+  🔴 Full
+</div>
+
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<script>
+  const map = L.map('map').setView([17.385, 78.4867], 13);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map);
+
+  let markers = {};
+  let userLat = 17.385;
+  let userLng = 78.4867;
+
+  // 📍 Distance function (km)
+  function getDistance(lat1, lng1, lat2, lng2) {
+    return Math.sqrt(
+      Math.pow(lat2 - lat1, 2) +
+      Math.pow(lng2 - lng1, 2)
+    ) * 111;
+  }
+
+  // 🔄 Load spots
+  async function loadSpots() {
+    const res = await fetch(
+      `http://localhost:5000/api/parking?lat=${userLat}&lng=${userLng}`
+    );
+    const data = await res.json();
+
+    const now = Date.now();
+
+    // 🧹 Remove markers not in API
+    const currentIds = new Set(data.map(s => s._id));
+    Object.keys(markers).forEach(id => {
+      if (!currentIds.has(id)) {
+        map.removeLayer(markers[id]);
+        delete markers[id];
+      }
+    });
+
+    data.forEach(spot => {
+
+      // ⏱️ Remove expired (30 min)
+      const updatedTime = new Date(spot.updatedAt).getTime();
+      if (now - updatedTime > 30 * 60 * 1000) {
+        if (markers[spot._id]) {
+          map.removeLayer(markers[spot._id]);
+          delete markers[spot._id];
+        }
+        return;
+      }
+
+      const distance = getDistance(
+        userLat, userLng,
+        spot.location.lat, spot.location.lng
+      ).toFixed(2);
+
+      const icon = L.icon({
+        iconUrl: spot.status === "available"
+          ? "https://maps.google.com/mapfiles/ms/icons/green-dot.png"
+          : "https://maps.google.com/mapfiles/ms/icons/red-dot.png",
+        iconSize: [32, 32]
+      });
+
+      // 🔄 Update existing marker
+      if (markers[spot._id]) {
+        markers[spot._id].setIcon(icon);
+
+        markers[spot._id].bindPopup(
+          `<b>Status:</b> ${spot.status}<br>
+           <b>Distance:</b> ${distance} km<br>
+           <b>Location:</b> ${spot.plusCode}<br><br>
+           <button onclick="updateStatus('${spot._id}', '${spot.status}', this)">
+             Toggle Status
+           </button>`
+        );
+
+        return;
+      }
+
+      // ➕ Add new marker
+      const marker = L.marker(
+        [spot.location.lat, spot.location.lng],
+        { icon }
+      ).addTo(map);
+
+      marker._spotId = spot._id;
+
+      marker.bindPopup(
+        `<b>Status:</b> ${spot.status}<br>
+         <b>Distance:</b> ${distance} km<br>
+         <b>Location:</b> ${spot.plusCode}<br><br>
+         <button onclick="updateStatus('${spot._id}', '${spot.status}', this)">
+           Toggle Status
+         </button>`
+      );
+
+      markers[spot._id] = marker;
+    });
+  }
+
+  // 🔄 Auto refresh
+  setInterval(loadSpots, 20000);
+
+  // 🟢 Add parking
+  map.on("click", async function(e) {
+    const lat = e.latlng.lat;
+    const lng = e.latlng.lng;
+
+    if (!confirm("Add parking here?")) return;
+
+    const res = await fetch("http://localhost:5000/api/parking", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        location: { lat, lng },
+        plusCode: `Lat:${lat.toFixed(3)},Lng:${lng.toFixed(3)}`,
+        status: "available",
+        vehicleType: "4w"
+      })
+    });
+
+    await res.json();
+    loadSpots();
+  });
+
+  // 🔥 Toggle status
+  window.updateStatus = async function(id, currentStatus) {
+    const newStatus = currentStatus === "available" ? "full" : "available";
+
+    await fetch(`http://localhost:5000/api/parking/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: newStatus })
+    });
+
+    loadSpots();
+  };
+
+  // 📍 User marker
+  L.marker([userLat, userLng])
+    .addTo(map)
+    .bindPopup("📍 You are here")
+    .openPopup();
+
+  // 🚀 Initial load
+  loadSpots();
+</script>
+
+</body>
+</html>

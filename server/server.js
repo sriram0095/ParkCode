@@ -2,6 +2,8 @@ import express from "express";
 import cors from "cors";
 import mongoose from "mongoose";
 import ParkingSpot from "./models/ParkingSpot.js"; // 👈 import model
+import dotenv from "dotenv";
+dotenv.config();
 
 const app = express();
 
@@ -9,7 +11,7 @@ app.use(cors());
 app.use(express.json());
 
 // MongoDB connection
-mongoose.connect("mongodb://sriram:sriram441@ac-cxnzixe-shard-00-00.mm2tz1h.mongodb.net:27017,ac-cxnzixe-shard-00-01.mm2tz1h.mongodb.net:27017,ac-cxnzixe-shard-00-02.mm2tz1h.mongodb.net:27017/parkcode?ssl=true&replicaSet=atlas-lnsp4w-shard-0&authSource=admin&retryWrites=true&w=majority&appName=Cluster1")
+mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("MongoDB Connected"))
   .catch(err => console.log(err));
 
